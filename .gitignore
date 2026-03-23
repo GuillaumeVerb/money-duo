@@ -1,0 +1,46 @@
+# Env (ne jamais committer les secrets)
+.env
+.env.local
+.env.development.local
+.env.production.local
+**/.env
+!**/.env.example
+
+# Dependencies
+node_modules/
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.tsbuildinfo
+
+# Native (générés)
+mobile/ios
+mobile/android
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# OS / IDE
+.DS_Store
+*.pem
+.idea/
+.vscode/
+*.swp
+
+# Metro
+.metro-health-check*
+
+# Debug signing
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
