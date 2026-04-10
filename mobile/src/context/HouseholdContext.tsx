@@ -6,14 +6,26 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import {
+  demoCategories,
+  demoCategoryBudgets,
+  demoHousehold,
+  demoMembers,
+} from '../lib/demoData';
 import { supabase } from '../lib/supabase';
-import type { Category, Household, HouseholdMember } from '../lib/types';
+import type {
+  Category,
+  CategoryBudget,
+  Household,
+  HouseholdMember,
+} from '../lib/types';
 import { useAuth } from './AuthContext';
 
 type HouseholdContextValue = {
   household: Household | null;
   members: HouseholdMember[];
   categories: Category[];
+  categoryBudgets: CategoryBudget[];
   loading: boolean;
   refresh: () => Promise<void>;
   setHouseholdId: (id: string | null) => void;
@@ -24,10 +36,11 @@ const HouseholdContext = createContext<HouseholdContextValue | undefined>(
 );
 
 export function HouseholdProvider ({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, demoMode } = useAuth();
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryBudgets, setCategoryBudgets] = useState<CategoryBudget[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -35,6 +48,15 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       setHousehold(null);
       setMembers([]);
       setCategories([]);
+      setCategoryBudgets([]);
+      setLoading(false);
+      return;
+    }
+    if (demoMode) {
+      setHousehold(demoHousehold);
+      setMembers(demoMembers);
+      setCategories(demoCategories);
+      setCategoryBudgets(demoCategoryBudgets);
       setLoading(false);
       return;
     }
@@ -43,6 +65,7 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       .from('household_members')
       .select('household_id')
       .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle();
 
@@ -50,23 +73,29 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       setHousehold(null);
       setMembers([]);
       setCategories([]);
+      setCategoryBudgets([]);
       setLoading(false);
       return;
     }
 
     const hid = hm.household_id as string;
 
-    const [{ data: hh }, { data: mems }, { data: cats }] = await Promise.all([
-      supabase.from('households').select('*').eq('id', hid).single(),
-      supabase.from('household_members').select('*').eq('household_id', hid),
-      supabase.from('categories').select('*').eq('household_id', hid),
-    ]);
+    const [{ data: hh }, { data: mems }, { data: cats }, budgetsRes] =
+      await Promise.all([
+        supabase.from('households').select('*').eq('id', hid).single(),
+        supabase.from('household_members').select('*').eq('household_id', hid),
+        supabase.from('categories').select('*').eq('household_id', hid),
+        supabase.from('category_budgets').select('*').eq('household_id', hid),
+      ]);
 
     setHousehold(hh as Household);
     setMembers((mems ?? []) as HouseholdMember[]);
     setCategories((cats ?? []) as Category[]);
+    setCategoryBudgets(
+      budgetsRes.error ? [] : ((budgetsRes.data ?? []) as CategoryBudget[])
+    );
     setLoading(false);
-  }, [user]);
+  }, [user, demoMode]);
 
   useEffect(() => {
     void load();
@@ -78,6 +107,7 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
         setHousehold(null);
         setMembers([]);
         setCategories([]);
+        setCategoryBudgets([]);
         return;
       }
       void load();
@@ -90,11 +120,12 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       household,
       members,
       categories,
+      categoryBudgets,
       loading,
       refresh: load,
       setHouseholdId,
     }),
-    [household, members, categories, loading, load, setHouseholdId]
+    [household, members, categories, categoryBudgets, loading, load, setHouseholdId]
   );
 
   return (

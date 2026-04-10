@@ -2,25 +2,38 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-const url =
+const rawUrl =
   Constants.expoConfig?.extra?.supabaseUrl ??
   process.env.EXPO_PUBLIC_SUPABASE_URL;
-const anon =
+const rawAnon =
   Constants.expoConfig?.extra?.supabaseAnonKey ??
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!url || !anon) {
+/** Présent uniquement si les variables d’environnement sont renseignées (projet réel). */
+export const isSupabaseConfigured = Boolean(rawUrl && rawAnon);
+
+/** Valeurs factices pour que l’UI démarre sans .env (aperçu / dev uniquement). */
+const devPlaceholderUrl = 'https://preview.invalid.supabase.co';
+const devPlaceholderAnon =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.dev-placeholder-not-for-prod';
+
+const url = rawUrl ?? devPlaceholderUrl;
+const anon = rawAnon ?? devPlaceholderAnon;
+
+if (!isSupabaseConfigured) {
   console.warn(
-    'Money Duo: missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY'
+    'Money Duo: EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY absents — mode aperçu (requêtes API échoueront tant que le .env n’est pas configuré).'
   );
 }
 
-export const supabase = createClient(url ?? '', anon ?? '', {
+export const supabase = createClient(url, anon, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    /** Web : récupère la session depuis les liens e-mail (confirmation, reset). */
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });

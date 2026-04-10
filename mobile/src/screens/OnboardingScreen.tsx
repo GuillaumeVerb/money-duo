@@ -1,23 +1,37 @@
-import * as Linking from 'expo-linking';
+import * as Clipboard from 'expo-clipboard';
 import React, { useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useHousehold } from '../context/HouseholdContext';
 import { supabase } from '../lib/supabase';
+import { buildInviteUrl } from '../lib/inviteUrl';
+import { friendlyErrorMessage } from '../lib/userFriendlyError';
 import type { SplitRuleKind } from '../lib/types';
-import { colors, fontSize, radius, spacing } from '../theme/tokens';
+import { screenContentPaddingTop } from '../theme/screenLayout';
+import {
+  colors,
+  fontSize,
+  fontWeight,
+  hairline,
+  radius,
+  spacing,
+} from '../theme/tokens';
 
 const DEFAULT_CATEGORIES = ['Courses', 'Loyer', 'Loisirs', 'Santé', 'Autre'];
 
 export function OnboardingScreen () {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { refresh } = useHousehold();
   const [name, setName] = useState('');
@@ -74,21 +88,45 @@ export function OnboardingScreen () {
         expires_at: expires.toISOString(),
       });
 
-      const url = Linking.createURL('invite', {
-        scheme: 'moneyduo',
-        queryParams: { token },
-      });
-      await new Promise<void>((resolve) => {
-        Alert.alert(
-          'Invitation partenaire',
-          `Partage ce lien (7 jours) :\n\n${url}`,
-          [{ text: 'OK', onPress: () => resolve() }]
-        );
-      });
+      const url = buildInviteUrl(token);
+      const shareMessage = `Rejoins notre foyer sur Money Duo (lien valable 7 jours) :\n${url}`;
       await refresh();
+      const buttons: {
+        text: string;
+        style?: 'cancel' | 'destructive' | 'default';
+        onPress?: () => void;
+      }[] = [
+        {
+          text: 'Copier le lien',
+          onPress: () => {
+            void Clipboard.setStringAsync(url).catch(() => {
+              /* presse-papiers indisponible */
+            });
+          },
+        },
+      ];
+      if (Platform.OS !== 'web') {
+        buttons.push({
+          text: 'Partager…',
+          onPress: () => {
+            void Share.share({
+              message: shareMessage,
+              title: 'Invitation Money Duo',
+            }).catch(() => {
+              /* partage annulé */
+            });
+          },
+        });
+      }
+      buttons.push({ text: 'OK', style: 'cancel' });
+      Alert.alert(
+        'Invitation partenaire',
+        `Envoie ce lien à ton partenaire — il est valable 7 jours.\n\n${url}`,
+        buttons,
+        { cancelable: true }
+      );
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
-      Alert.alert('Création', msg);
+      Alert.alert('Création', friendlyErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -96,9 +134,13 @@ export function OnboardingScreen () {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.root}
+      contentContainerStyle={[
+        styles.root,
+        { paddingTop: screenContentPaddingTop(insets.top) },
+      ]}
       keyboardShouldPersistTaps="handled"
     >
+      <Text style={styles.kicker}>Première étape</Text>
       <Text style={styles.title}>Créer ton foyer</Text>
       <Text style={styles.sub}>
         Un espace partagé pour deux — tu pourras inviter ton·ta partenaire
@@ -107,11 +149,15 @@ export function OnboardingScreen () {
       <TextInput
         style={styles.input}
         placeholder="Nom du foyer"
-        placeholderTextColor={colors.neutralMuted}
+        placeholderTextColor={colors.textMuted}
         value={name}
         onChangeText={setName}
       />
       <Text style={styles.label}>Règle par défaut</Text>
+      <Text style={styles.ruleExpl}>
+        Elle s’applique aux prochaines dépenses ; l’historique déjà saisi garde
+        la règle du moment où elles ont été créées.
+      </Text>
       <View style={styles.row}>
         {(
           [
@@ -136,7 +182,7 @@ export function OnboardingScreen () {
           style={styles.input}
           keyboardType="decimal-pad"
           placeholder="Part du premier membre (%)"
-          placeholderTextColor={colors.neutralMuted}
+          placeholderTextColor={colors.textMuted}
           value={customPct}
           onChangeText={setCustomPct}
         />
@@ -154,35 +200,55 @@ export function OnboardingScreen () {
 
 const styles = StyleSheet.create({
   root: {
-    padding: spacing.lg,
-    backgroundColor: colors.neutralWarm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+    backgroundColor: colors.canvas,
     flexGrow: 1,
   },
+  kicker: {
+    fontSize: fontSize.caption,
+    fontWeight: fontWeight.medium,
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xs,
+  },
   title: {
-    fontSize: fontSize.title,
-    fontWeight: '700',
-    color: colors.neutralText,
+    fontSize: fontSize.display,
+    fontWeight: fontWeight.semibold,
+    color: colors.text,
     marginBottom: spacing.sm,
+    letterSpacing: -0.4,
   },
   sub: {
-    color: colors.neutralMuted,
+    color: colors.textSecondary,
     marginBottom: spacing.lg,
     fontSize: fontSize.small,
+    lineHeight: 22,
+    maxWidth: 360,
   },
   label: {
-    fontWeight: '600',
+    fontWeight: fontWeight.medium,
+    marginBottom: spacing.xs,
+    color: colors.text,
+    fontSize: fontSize.caption,
+  },
+  ruleExpl: {
+    fontSize: fontSize.caption,
+    color: colors.textMuted,
+    lineHeight: 18,
     marginBottom: spacing.sm,
-    color: colors.neutralText,
+    maxWidth: 360,
   },
   input: {
-    borderWidth: 1,
+    borderWidth: hairline,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
     backgroundColor: colors.surface,
     fontSize: fontSize.body,
-    color: colors.neutralText,
+    color: colors.text,
   },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   chip: {

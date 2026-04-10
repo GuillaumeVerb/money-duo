@@ -1,28 +1,53 @@
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  type NavigatorScreenParams,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useAuth } from '../context/AuthContext';
 import { useHousehold } from '../context/HouseholdContext';
-import { colors } from '../theme/tokens';
-import { MainTabs } from './MainTabs';
+import { colors, fontSize, fontWeight } from '../theme/tokens';
+import { MainTabs, type MainTabParamList } from './MainTabs';
 import { AddExpenseScreen } from '../screens/AddExpenseScreen';
+import { ExpenseDetailScreen } from '../screens/ExpenseDetailScreen';
+import { MonthlyRecapScreen } from '../screens/MonthlyRecapScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { HelpScreen } from '../screens/HelpScreen';
+import { LegalInfoScreen } from '../screens/LegalInfoScreen';
+import { GoalDetailScreen } from '../screens/GoalDetailScreen';
+import { DecisionMemoHistoryScreen } from '../screens/DecisionMemoHistoryScreen';
+import { RecurringChargesScreen } from '../screens/RecurringChargesScreen';
+import { MonthHistoryScreen } from '../screens/MonthHistoryScreen';
+import { FinancialCharterScreen } from '../screens/FinancialCharterScreen';
+import { LightSimulatorScreen } from '../screens/LightSimulatorScreen';
 import { supabase } from '../lib/supabase';
+import type { Goal } from '../lib/types';
 
 export type RootStackParamList = {
   Login: undefined;
   Onboarding: undefined;
-  Main: undefined;
-  AddExpense: { expenseId?: string } | undefined;
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
+  AddExpense: { expenseId?: string; duplicateFromId?: string } | undefined;
+  ExpenseDetail: { expenseId: string };
+  MonthlyRecap: { initialMonthKey?: string } | undefined;
+  Help: undefined;
+  LegalInfo: { document: 'privacy' | 'terms' };
+  GoalDetail: { goalId?: string; goalSnapshot?: Goal } | undefined;
+  RecurringCharges: undefined;
+  DecisionMemoHistory: undefined;
+  MonthHistory: undefined;
+  FinancialCharter: undefined;
+  LightSimulator: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator () {
-  const { session, loading: authLoading } = useAuth();
+  const { session, demoMode, isAuthenticated, loading: authLoading } =
+    useAuth();
   const { household, loading: hhLoading, refresh } = useHousehold();
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(
     null
@@ -50,7 +75,7 @@ export function RootNavigator () {
   }, []);
 
   useEffect(() => {
-    if (!session?.user || !pendingInviteToken) {
+    if (demoMode || !session?.user || !pendingInviteToken) {
       return;
     }
     let cancelled = false;
@@ -66,29 +91,29 @@ export function RootNavigator () {
     return () => {
       cancelled = true;
     };
-  }, [session?.user, pendingInviteToken, refresh]);
+  }, [session?.user, pendingInviteToken, refresh, demoMode]);
 
-  if (authLoading || (session && hhLoading)) {
+  if (authLoading || (isAuthenticated && hhLoading)) {
     return (
       <View
         style={{
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: colors.neutralWarm,
+          backgroundColor: colors.canvas,
         }}
       >
-        <ActivityIndicator size="large" color={colors.accent} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  const showOnboarding = session && !household;
+  const showOnboarding = isAuthenticated && !household;
 
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!session ? (
+        {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : showOnboarding ? (
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
@@ -103,9 +128,164 @@ export function RootNavigator () {
                 headerShown: true,
                 title: route.params?.expenseId
                   ? 'Modifier la dépense'
-                  : 'Ajouter une dépense',
-                headerTintColor: colors.accent,
+                  : route.params?.duplicateFromId
+                    ? 'Dupliquer'
+                    : 'Nouvelle dépense',
+                headerTintColor: colors.primary,
+                headerStyle: { backgroundColor: colors.canvas },
+                headerShadowVisible: false,
+                headerTitleStyle: {
+                  fontSize: fontSize.titleSm,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.text,
+                },
               })}
+            />
+            <Stack.Screen
+              name="ExpenseDetail"
+              component={ExpenseDetailScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Détail',
+                headerTintColor: colors.primary,
+                headerStyle: { backgroundColor: colors.canvas },
+                headerShadowVisible: false,
+                headerTitleStyle: {
+                  fontSize: fontSize.titleSm,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.text,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="MonthlyRecap"
+              component={MonthlyRecapScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Récap du mois',
+                headerTintColor: colors.primary,
+                headerStyle: { backgroundColor: colors.canvas },
+                headerShadowVisible: false,
+                headerTitleStyle: {
+                  fontSize: fontSize.titleSm,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.text,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="Help"
+              component={HelpScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Aide',
+                headerTintColor: colors.primary,
+                headerStyle: { backgroundColor: colors.canvas },
+                headerShadowVisible: false,
+                headerTitleStyle: {
+                  fontSize: fontSize.titleSm,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.text,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="LegalInfo"
+              component={LegalInfoScreen}
+              options={({ route }) => ({
+                presentation: 'modal',
+                headerShown: true,
+                title:
+                  route.params?.document === 'privacy'
+                    ? 'Confidentialité'
+                    : 'CGU',
+                headerTintColor: colors.primary,
+                headerStyle: { backgroundColor: colors.canvas },
+                headerShadowVisible: false,
+                headerTitleStyle: {
+                  fontSize: fontSize.titleSm,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.text,
+                },
+              })}
+            />
+            <Stack.Screen
+              name="GoalDetail"
+              component={GoalDetailScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Objectif',
+                headerTintColor: colors.primary,
+                headerStyle: { backgroundColor: colors.canvas },
+                headerShadowVisible: false,
+                headerTitleStyle: {
+                  fontSize: fontSize.titleSm,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.text,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="RecurringCharges"
+              component={RecurringChargesScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="DecisionMemoHistory"
+              component={DecisionMemoHistoryScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="MonthHistory"
+              component={MonthHistoryScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="FinancialCharter"
+              component={FinancialCharterScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Contrat léger',
+                headerTintColor: colors.primary,
+                headerStyle: { backgroundColor: colors.canvas },
+                headerShadowVisible: false,
+                headerTitleStyle: {
+                  fontSize: fontSize.titleSm,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.text,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="LightSimulator"
+              component={LightSimulatorScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Simulateur',
+                headerTintColor: colors.primary,
+                headerStyle: { backgroundColor: colors.canvas },
+                headerShadowVisible: false,
+                headerTitleStyle: {
+                  fontSize: fontSize.titleSm,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.text,
+                },
+              }}
             />
           </>
         )}

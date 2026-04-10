@@ -1,0 +1,6 @@
+# Fichiers générés par le CLI Supabase (liens locaux, branches, etc.)
+.branches
+.temp
+
+# Payloads JSON découpés pour apply_migration (MCP / copier-coller) — pas la source de vérité
+.cursor-mcp-batch/
