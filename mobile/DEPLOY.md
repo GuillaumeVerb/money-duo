@@ -64,12 +64,12 @@ Le dépôt inclut un workflow qui lance `npm run typecheck` et `npm test` dans `
 
 Pour distribuer une **app installable** (pas seulement le site web) :
 
-1. Compte [Expo](https://expo.dev) et CLI : `npm i -g eas-cli` ou utiliser `npx eas-cli@latest`.
-2. Une fois par dépôt : `cd mobile && npm run eas:init` — lie le projet Expo et écrit `extra.eas.projectId` dans `app.config.js` (à committer).
-3. **Identifiants** : `ios.bundleIdentifier` et `android.package` sont définis dans `app.config.js` (`com.moneyduo.app`). Change-les si besoin **avant** la première soumission store (souvent figés ensuite).
-4. **Variables `EXPO_PUBLIC_*`** : les mêmes que pour le web doivent être présentes **au moment du build** EAS (dashboard projet EAS → *Environment variables*, ou `eas secret:create` / secrets par profil). Sans elles, l’app peut tourner en mode démo locale uniquement.
-5. **Auth / deep links** : dans Supabase, ajoute le schème custom `moneyduo://` (et les URLs de redirect EAS si Expo les fournit) dans *Redirect URLs*, en plus de l’URL web.
-6. **Lancer un build** :
-   - `npm run eas:build:ios` / `eas:build:android` / `eas:build:all` (profil `production` dans `eas.json`).
-   - Profil `preview` : binaire **interne** (ex. APK Android pour testeurs sans Play Store).
-7. **Soumission stores** : comptes Apple Developer et Google Play Console ; ensuite `eas submit` ([doc](https://docs.expo.dev/submit/introduction/)). Prévoir fiches App Store / Play (confidentialité, captures, politique de confidentialité URL si requis).
+1. Compte [Expo](https://expo.dev). En local : `cd mobile && npm ci` (EAS est fourni via `eas-cli` en devDependency).
+2. **Jeton** : crée un *access token* sur [expo.dev → compte → Access tokens](https://expo.dev/accounts/_/settings/access-tokens), puis `export EXPO_TOKEN=...` dans ton terminal **ou** `npx eas-cli@latest login`.
+3. **Une commande (recommandé)** : avec `mobile/.env` rempli comme pour le web, exécute `npm run eas:bootstrap`. Le script lance `eas init --non-interactive --force` (crée/lie le projet EAS et écrit `extra.eas.projectId` dans `app.config.js`) puis pousse les secrets `EXPO_PUBLIC_*` vers le projet EAS. **Commit** ensuite le `app.config.js` modifié.
+4. Alternative manuelle : `npm run eas:init`, puis secrets via le dashboard EAS ou `eas secret:create --scope project --name EXPO_PUBLIC_...`.
+5. **Identifiants** : `ios.bundleIdentifier` et `android.package` sont dans `app.config.js` (`com.moneyduo.app`). À ajuster **avant** la première soumission store si besoin.
+6. **Auth / deep links** : dans Supabase, ajoute le schème `moneyduo://` (et les redirect URLs indiquées par Expo après un build) dans *Redirect URLs*, en plus de l’URL web.
+7. **Build** : `npm run eas:build:android` / `eas:build:ios` / `eas:build:all` (profil `production`). Profil `preview` dans `eas.json` : APK interne Android.
+8. **CI GitHub** : ajoute le secret dépôt `EXPO_TOKEN`, puis lance le workflow **EAS Build** (*Actions* → *EAS Build* → *Run workflow*). Nécessite un `app.config.js` déjà commité avec `extra.eas.projectId`.
+9. **Soumission stores** : Apple Developer + Google Play ; `eas submit` ([doc](https://docs.expo.dev/submit/introduction/)). Prévoir métadonnées et URL de politique de confidentialité si requis.

@@ -8,10 +8,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "export:web": "expo export --platform web",
-    "eas:init": "npx eas-cli@latest init",
-    "eas:build:ios": "npx eas-cli@latest build --platform ios --profile production",
-    "eas:build:android": "npx eas-cli@latest build --platform android --profile production",
-    "eas:build:all": "npx eas-cli@latest build --platform all --profile production",
+    "eas:init": "npx eas init",
+    "eas:bootstrap": "bash ./scripts/eas-link-and-secrets.sh",
+    "eas:build:ios": "npx eas build --platform ios --profile production",
+    "eas:build:android": "npx eas build --platform android --profile production",
+    "eas:build:all": "npx eas build --platform all --profile production",
     "typecheck": "tsc --noEmit",
     "test": "jest --config jest.config.cjs --forceExit",
     "test:attachment": "jest --config jest.config.cjs --forceExit --testPathPatterns=attachmentUrl"
@@ -42,7 +43,11 @@
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "^0.21.0"
   },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "devDependencies": {
+    "eas-cli": "~18.5.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.5.0",
     "@types/react": "~19.2.2",
