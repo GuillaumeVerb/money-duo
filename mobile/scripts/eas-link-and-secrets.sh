@@ -20,8 +20,13 @@ if [[ -z "${EXPO_TOKEN:-}" ]] && ! eas_cli whoami >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "→ eas init (projet EAS + écriture de extra.eas.projectId dans app.config.js)"
-eas_cli init --non-interactive --force
+# app.config.js dynamique : EAS n’écrit pas le projectId tout seul — il doit être dans extra.eas.
+if grep -q "projectId" "$ROOT/app.config.js"; then
+  echo "→ Projet EAS déjà lié (extra.eas.projectId dans app.config.js) — pas de eas init."
+else
+  echo "→ eas init (crée le projet ; si échec « dynamic config », ajoute extra.eas.projectId manuellement puis relance)"
+  eas_cli init --non-interactive --force
+fi
 
 ENV_FILE="$ROOT/.env"
 if [[ ! -f "$ENV_FILE" ]]; then

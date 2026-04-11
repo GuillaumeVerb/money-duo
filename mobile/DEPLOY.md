@@ -66,7 +66,7 @@ Pour distribuer une **app installable** (pas seulement le site web) :
 
 1. Compte [Expo](https://expo.dev). En local : `cd mobile && npm ci` (EAS est fourni via `eas-cli` en devDependency).
 2. **Jeton** : crée un *access token* sur [expo.dev → compte → Access tokens](https://expo.dev/accounts/_/settings/access-tokens), puis `export EXPO_TOKEN=...` dans ton terminal **ou** `npx eas-cli@latest login`.
-3. **Une commande (recommandé)** : avec `mobile/.env` rempli comme pour le web, exécute `npm run eas:bootstrap`. Le script lance `eas init --non-interactive --force` (crée/lie le projet EAS et écrit `extra.eas.projectId` dans `app.config.js`) puis pousse les secrets `EXPO_PUBLIC_*` vers le projet EAS. **Commit** ensuite le `app.config.js` modifié.
+3. **Une commande (recommandé)** : avec `mobile/.env` rempli comme pour le web, exécute `npm run eas:bootstrap`. Le script lance `eas init` si besoin, puis pousse les secrets `EXPO_PUBLIC_*` vers le projet EAS. Avec **`app.config.js`** (config dynamique), Expo ne peut pas écrire le `projectId` tout seul : si `eas init` affiche un UUID à copier, ajoute `extra.eas.projectId` et `owner` dans `app.config.js` comme dans le dépôt, puis relance `npm run eas:bootstrap` pour les secrets. **Commit** le `app.config.js` mis à jour.
 4. Alternative manuelle : `npm run eas:init`, puis secrets via le dashboard EAS ou `eas secret:create --scope project --name EXPO_PUBLIC_...`.
 5. **Identifiants** : `ios.bundleIdentifier` et `android.package` sont dans `app.config.js` (`com.moneyduo.app`). À ajuster **avant** la première soumission store si besoin.
 6. **Auth / deep links** : dans Supabase, ajoute le schème `moneyduo://` (et les redirect URLs indiquées par Expo après un build) dans *Redirect URLs*, en plus de l’URL web.

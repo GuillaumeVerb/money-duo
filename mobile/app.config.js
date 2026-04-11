@@ -2,6 +2,7 @@
 module.exports = {
   expo: {
     name: 'Money Duo',
+    owner: 'guillaumeverb',
     slug: 'money-duo',
     version: '1.0.0',
     orientation: 'portrait',
@@ -34,6 +35,9 @@ module.exports = {
       '@react-native-community/datetimepicker',
     ],
     extra: {
+      eas: {
+        projectId: '510077ed-a9b8-4f4f-9b0a-da49597fabcc',
+      },
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? '',
