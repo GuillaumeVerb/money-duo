@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useToast } from '../context/ToastContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { friendlyErrorMessage } from '../lib/userFriendlyError';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,7 @@ import { colors, fontSize, fontWeight, hairline, radius, shadow, spacing } from 
 
 export function LoginScreen () {
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const { signIn, signUp, enterDemoMode, resetPasswordForEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,26 +29,58 @@ export function LoginScreen () {
   const [resetEmail, setResetEmail] = useState('');
   const [resetBusy, setResetBusy] = useState(false);
 
+  /** Sur le web, `Alert.alert` est souvent invisible ; on utilise les toasts. */
+  const notify = useCallback(
+    (
+      title: string,
+      message?: string,
+      variant: 'neutral' | 'success' | 'danger' = 'neutral'
+    ) => {
+      if (Platform.OS === 'web') {
+        const line = message ? `${title} — ${message}` : title;
+        showToast(
+          line,
+          variant === 'danger' ? 'danger' : variant === 'success' ? 'success' : 'neutral'
+        );
+      } else if (message) {
+        Alert.alert(title, message);
+      } else {
+        Alert.alert(title);
+      }
+    },
+    [showToast]
+  );
+
   async function submit () {
+    const em = email.trim();
+    if (!em || !password) {
+      notify('Champs requis', 'Indique un e-mail et un mot de passe.', 'danger');
+      return;
+    }
     try {
       if (mode === 'login') {
-        await signIn(email.trim(), password);
+        await signIn(em, password);
       } else {
-        await signUp(email.trim(), password);
-        Alert.alert(
+        await signUp(em, password);
+        notify(
           'Compte créé',
-          'Vérifie ta boîte mail si la confirmation est requise par le projet Supabase.'
+          'Vérifie ta boîte mail si la confirmation est requise par le projet Supabase.',
+          'success'
         );
       }
     } catch (e: unknown) {
-      Alert.alert('Connexion', friendlyErrorMessage(e));
+      notify(
+        mode === 'login' ? 'Connexion' : 'Inscription',
+        friendlyErrorMessage(e),
+        'danger'
+      );
     }
   }
 
   async function sendReset () {
     const em = resetEmail.trim() || email.trim();
     if (!em) {
-      Alert.alert('E-mail', 'Indiquez l’adresse du compte.');
+      notify('E-mail', 'Indique l’adresse du compte.', 'danger');
       return;
     }
     setResetBusy(true);
@@ -54,16 +88,22 @@ export function LoginScreen () {
       await resetPasswordForEmail(em);
       setResetOpen(false);
       setResetEmail('');
-      Alert.alert(
+      notify(
         'E-mail envoyé',
-        'Si un compte existe, vous recevrez un lien pour choisir un nouveau mot de passe.'
+        'Si un compte existe, tu recevras un lien pour choisir un nouveau mot de passe.',
+        'success'
       );
     } catch (e: unknown) {
-      Alert.alert('Réinitialisation', friendlyErrorMessage(e));
+      notify('Réinitialisation', friendlyErrorMessage(e), 'danger');
     } finally {
       setResetBusy(false);
     }
   }
+
+  const webPointer =
+    Platform.OS === 'web'
+      ? ({ cursor: 'pointer' } as { cursor: 'pointer' })
+      : {};
 
   return (
     <KeyboardAvoidingView
@@ -117,12 +157,16 @@ export function LoginScreen () {
           value={password}
           onChangeText={setPassword}
         />
-        <Pressable style={styles.primary} onPress={() => void submit()}>
+        <Pressable
+          style={[styles.primary, webPointer]}
+          onPress={() => void submit()}
+        >
           <Text style={styles.primaryText}>
             {mode === 'login' ? 'Se connecter' : 'Créer un compte'}
           </Text>
         </Pressable>
         <Pressable
+          style={webPointer}
           onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
         >
           <Text style={styles.link}>
@@ -132,14 +176,14 @@ export function LoginScreen () {
           </Text>
         </Pressable>
         {mode === 'login' ? (
-          <Pressable onPress={() => setResetOpen(true)}>
+          <Pressable style={webPointer} onPress={() => setResetOpen(true)}>
             <Text style={styles.linkMuted}>Mot de passe oublié ?</Text>
           </Pressable>
         ) : null}
         <View style={styles.divider} />
         <Text style={styles.previewKicker}>Mode aperçu</Text>
         <Pressable
-          style={styles.secondary}
+          style={[styles.secondary, webPointer]}
           onPress={() => enterDemoMode()}
         >
           <Ionicons name="play-circle-outline" size={20} color={colors.primary} />
@@ -151,6 +195,49 @@ export function LoginScreen () {
           d’invitation.
         </Text>
       </View>
+
+      <Modal
+        visible={resetOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResetOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setResetOpen(false)}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Mot de passe oublié</Text>
+            <Text style={styles.modalSub}>
+              Saisis l’e-mail du compte : tu recevras un lien si l’adresse existe.
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={resetEmail}
+              onChangeText={setResetEmail}
+            />
+            <Pressable
+              style={[styles.primary, webPointer, { marginTop: spacing.sm }]}
+              disabled={resetBusy}
+              onPress={() => void sendReset()}
+            >
+              <Text style={styles.primaryText}>
+                {resetBusy ? 'Envoi…' : 'Envoyer le lien'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[webPointer, { marginTop: spacing.md }]}
+              onPress={() => setResetOpen(false)}
+            >
+              <Text style={styles.link}>Annuler</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
