@@ -14,7 +14,12 @@ import { colors, fontSize, fontWeight, radius, spacing } from '../theme/tokens';
 export type ToastVariant = 'success' | 'neutral' | 'danger';
 
 type ToastContextValue = {
-  showToast: (message: string, variant?: ToastVariant) => void;
+  /** `durationMs` : défaut ~2800 ; mettre plus long pour un message important (ex. inscription). */
+  showToast: (
+    message: string,
+    variant?: ToastVariant,
+    durationMs?: number
+  ) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
@@ -53,7 +58,7 @@ export function ToastProvider ({ children }: { children: React.ReactNode }) {
   }, [opacity]);
 
   const showToast = useCallback(
-    (msg: string, v: ToastVariant = 'neutral') => {
+    (msg: string, v: ToastVariant = 'neutral', durationMs = 2800) => {
       if (hideTimer.current) {
         clearTimeout(hideTimer.current);
       }
@@ -67,7 +72,7 @@ export function ToastProvider ({ children }: { children: React.ReactNode }) {
       }).start();
       hideTimer.current = setTimeout(() => {
         hide();
-      }, 2800);
+      }, durationMs);
     },
     [hide, opacity]
   );
@@ -130,6 +135,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 99999,
+    elevation: 99999,
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
   },

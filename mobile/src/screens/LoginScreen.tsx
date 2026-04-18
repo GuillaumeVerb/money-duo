@@ -28,19 +28,23 @@ export function LoginScreen () {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetBusy, setResetBusy] = useState(false);
+  /** Message visible dans l’écran (surtout web) après inscription — le toast seul peut passer inaperçu. */
+  const [registerHint, setRegisterHint] = useState<string | null>(null);
 
-  /** Sur le web, `Alert.alert` est souvent invisible ; on utilise les toasts. */
+  /** Sur le web, `Alert.alert` est souvent invisible ; on utilise les toasts + bandeau. */
   const notify = useCallback(
     (
       title: string,
       message?: string,
-      variant: 'neutral' | 'success' | 'danger' = 'neutral'
+      variant: 'neutral' | 'success' | 'danger' = 'neutral',
+      toastDurationMs?: number
     ) => {
       if (Platform.OS === 'web') {
         const line = message ? `${title} — ${message}` : title;
         showToast(
           line,
-          variant === 'danger' ? 'danger' : variant === 'success' ? 'success' : 'neutral'
+          variant === 'danger' ? 'danger' : variant === 'success' ? 'success' : 'neutral',
+          toastDurationMs ?? 2800
         );
       } else if (message) {
         Alert.alert(title, message);
@@ -62,10 +66,14 @@ export function LoginScreen () {
         await signIn(em, password);
       } else {
         await signUp(em, password);
+        setRegisterHint(
+          'Un e-mail de confirmation t’a été envoyé. Ouvre-le et clique sur le lien pour activer ton compte, puis reviens ici pour te connecter.'
+        );
         notify(
           'Compte créé',
-          'Vérifie ta boîte mail si la confirmation est requise par le projet Supabase.',
-          'success'
+          'Vérifie aussi ta boîte mail (et les spams).',
+          'success',
+          9000
         );
       }
     } catch (e: unknown) {
@@ -137,6 +145,17 @@ export function LoginScreen () {
       </Text>
 
       <View style={styles.card}>
+        {registerHint ? (
+          <View style={styles.registerBanner} accessibilityRole="alert">
+            <Text style={styles.registerBannerText}>{registerHint}</Text>
+            <Pressable
+              style={[styles.registerBannerBtn, webPointer]}
+              onPress={() => setRegisterHint(null)}
+            >
+              <Text style={styles.registerBannerBtnTxt}>OK</Text>
+            </Pressable>
+          </View>
+        ) : null}
         <Text style={styles.cardTitle}>
           {mode === 'login' ? 'Connexion' : 'Créer un compte'}
         </Text>
@@ -167,7 +186,10 @@ export function LoginScreen () {
         </Pressable>
         <Pressable
           style={webPointer}
-          onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
+          onPress={() => {
+            setRegisterHint(null);
+            setMode(mode === 'login' ? 'register' : 'login');
+          }}
         >
           <Text style={styles.link}>
             {mode === 'login'
@@ -294,6 +316,33 @@ const styles = StyleSheet.create({
     borderWidth: hairline,
     borderColor: colors.borderLight,
     ...shadow.card,
+  },
+  registerBanner: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  registerBannerText: {
+    fontSize: fontSize.small,
+    color: colors.text,
+    lineHeight: 22,
+    fontWeight: fontWeight.medium,
+  },
+  registerBannerBtn: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+  },
+  registerBannerBtnTxt: {
+    color: colors.textInverse,
+    fontWeight: fontWeight.semibold,
+    fontSize: fontSize.small,
   },
   cardTitle: {
     fontSize: fontSize.titleSm,
