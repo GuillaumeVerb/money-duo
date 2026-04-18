@@ -40,6 +40,15 @@ export function friendlyErrorMessage (e: unknown): string {
   if (lower.includes ('violates foreign key') || lower.includes ('foreign key')) {
     return 'Impossible : des données y sont encore liées.';
   }
+  if (
+    lower.includes ('rate limit') ||
+    lower.includes ('too many requests') ||
+    lower.includes ('429') ||
+    lower.includes ('over_email_send_rate_limit') ||
+    lower.includes ('email rate limit')
+  ) {
+    return 'Trop de tentatives pour l’instant (protection Supabase). Attends 10 à 15 minutes ou réessaie plus tard.';
+  }
   if (m.length > 180) {
     return `${m.slice (0, 177)}…`;
   }
