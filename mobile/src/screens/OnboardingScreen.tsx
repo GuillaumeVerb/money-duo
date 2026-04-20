@@ -1,11 +1,11 @@
 import * as Clipboard from 'expo-clipboard';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useHousehold } from '../context/HouseholdContext';
+import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { buildInviteUrl } from '../lib/inviteUrl';
 import { friendlyErrorMessage } from '../lib/userFriendlyError';
@@ -30,18 +31,57 @@ import {
 
 const DEFAULT_CATEGORIES = ['Courses', 'Loyer', 'Loisirs', 'Santé', 'Autre'];
 
+function randomInviteToken (): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 export function OnboardingScreen () {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { refresh } = useHousehold();
+  const { showToast } = useToast();
   const [name, setName] = useState('');
   const [rule, setRule] = useState<SplitRuleKind>('equal');
   const [customPct, setCustomPct] = useState('50');
   const [busy, setBusy] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+
+  const notify = useCallback(
+    (
+      title: string,
+      message?: string,
+      variant: 'neutral' | 'success' | 'danger' = 'neutral',
+      toastDurationMs?: number
+    ) => {
+      if (Platform.OS === 'web') {
+        const line = message ? `${title} — ${message}` : title;
+        showToast(
+          line,
+          variant === 'danger' ? 'danger' : variant === 'success' ? 'success' : 'neutral',
+          toastDurationMs ?? 2800
+        );
+      } else if (message) {
+        Alert.alert(title, message);
+      } else {
+        Alert.alert(title);
+      }
+    },
+    [showToast]
+  );
+
+  const finishInviteFlow = useCallback(async () => {
+    setInviteOpen(false);
+    setInviteUrl(null);
+    await refresh({ silent: true });
+  }, [refresh]);
 
   async function createHousehold () {
     if (!user || !name.trim()) {
-      Alert.alert('Foyer', 'Donne un nom à ton foyer.');
+      notify('Foyer', 'Donne un nom à ton foyer.', 'danger');
       return;
     }
     setBusy(true);
@@ -59,7 +99,7 @@ export function OnboardingScreen () {
         .single();
 
       if (hErr || !hh) {
-        throw hErr ?? new Error('household');
+        throw hErr ?? new Error('Impossible de créer le foyer.');
       }
 
       const { error: mErr } = await supabase.from('household_members').insert({
@@ -75,62 +115,48 @@ export function OnboardingScreen () {
         household_id: hh.id,
         name: n,
       }));
-      await supabase.from('categories').insert(cats);
+      const { error: catErr } = await supabase.from('categories').insert(cats);
+      if (catErr) {
+        throw catErr;
+      }
 
-      const token = globalThis.crypto.randomUUID();
+      const token = randomInviteToken();
       const expires = new Date();
       expires.setDate(expires.getDate() + 7);
 
-      await supabase.from('household_invites').insert({
+      const { error: invErr } = await supabase.from('household_invites').insert({
         household_id: hh.id,
         token,
         invited_by: user.id,
         expires_at: expires.toISOString(),
       });
+      if (invErr) {
+        throw invErr;
+      }
 
       const url = buildInviteUrl(token);
-      const shareMessage = `Rejoins notre foyer sur Money Duo (lien valable 7 jours) :\n${url}`;
-      await refresh();
-      const buttons: {
-        text: string;
-        style?: 'cancel' | 'destructive' | 'default';
-        onPress?: () => void;
-      }[] = [
-        {
-          text: 'Copier le lien',
-          onPress: () => {
-            void Clipboard.setStringAsync(url).catch(() => {
-              /* presse-papiers indisponible */
-            });
-          },
-        },
-      ];
-      if (Platform.OS !== 'web') {
-        buttons.push({
-          text: 'Partager…',
-          onPress: () => {
-            void Share.share({
-              message: shareMessage,
-              title: 'Invitation Money Duo',
-            }).catch(() => {
-              /* partage annulé */
-            });
-          },
-        });
-      }
-      buttons.push({ text: 'OK', style: 'cancel' });
-      Alert.alert(
-        'Invitation partenaire',
-        `Envoie ce lien à ton partenaire — il est valable 7 jours.\n\n${url}`,
-        buttons,
-        { cancelable: true }
+
+      // Ne pas appeler refresh() tout de suite : ça mettait loading=true et remplaçait
+      // tout l’écran par le spinner (RootNavigator), ce qui démontait l’onboarding sans feedback.
+      setInviteUrl(url);
+      setInviteOpen(true);
+      notify(
+        'Foyer créé',
+        'Copie le lien pour ton partenaire (valable 7 jours).',
+        'success',
+        6000
       );
     } catch (e: unknown) {
-      Alert.alert('Création', friendlyErrorMessage(e));
+      notify('Création', friendlyErrorMessage(e), 'danger', 6000);
     } finally {
       setBusy(false);
     }
   }
+
+  const webPointer =
+    Platform.OS === 'web'
+      ? ({ cursor: 'pointer' } as { cursor: 'pointer' })
+      : {};
 
   return (
     <ScrollView
@@ -168,7 +194,7 @@ export function OnboardingScreen () {
         ).map(([k, label]) => (
           <Pressable
             key={k}
-            style={[styles.chip, rule === k && styles.chipOn]}
+            style={[styles.chip, rule === k && styles.chipOn, webPointer]}
             onPress={() => setRule(k)}
           >
             <Text style={[styles.chipText, rule === k && styles.chipTextOn]}>
@@ -188,12 +214,54 @@ export function OnboardingScreen () {
         />
       )}
       <Pressable
-        style={[styles.primary, busy && { opacity: 0.6 }]}
+        style={[styles.primary, busy && { opacity: 0.6 }, webPointer]}
         disabled={busy}
         onPress={() => void createHousehold()}
       >
         <Text style={styles.primaryText}>Continuer</Text>
       </Pressable>
+
+      <Modal
+        visible={inviteOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => void finishInviteFlow()}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => void finishInviteFlow()}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Invitation partenaire</Text>
+            <Text style={styles.modalSub}>
+              Envoie ce lien à ton partenaire — valable 7 jours.
+            </Text>
+            {inviteUrl ? (
+              <Text style={styles.modalUrl} selectable>
+                {inviteUrl}
+              </Text>
+            ) : null}
+            <Pressable
+              style={[styles.secondaryBtn, webPointer]}
+              onPress={() => {
+                if (inviteUrl) {
+                  void Clipboard.setStringAsync(inviteUrl).then(() => {
+                    notify('Copié', 'Lien copié dans le presse-papiers.', 'success');
+                  });
+                }
+              }}
+            >
+              <Text style={styles.secondaryBtnTxt}>Copier le lien</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.primary, webPointer, { marginTop: spacing.md }]}
+              onPress={() => void finishInviteFlow()}
+            >
+              <Text style={styles.primaryText}>Continuer vers l’app</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -273,4 +341,51 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   primaryText: { color: colors.surface, fontWeight: '600', fontSize: fontSize.body },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    borderWidth: hairline,
+    borderColor: colors.borderLight,
+    maxWidth: 420,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  modalTitle: {
+    fontSize: fontSize.titleSm,
+    fontWeight: fontWeight.semibold,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  modalSub: {
+    fontSize: fontSize.small,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  modalUrl: {
+    fontSize: fontSize.caption,
+    color: colors.primary,
+    marginBottom: spacing.md,
+    lineHeight: 20,
+  },
+  secondaryBtn: {
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.canvas,
+  },
+  secondaryBtnTxt: {
+    fontWeight: fontWeight.semibold,
+    fontSize: fontSize.body,
+    color: colors.text,
+  },
 });

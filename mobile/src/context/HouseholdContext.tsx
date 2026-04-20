@@ -21,13 +21,18 @@ import type {
 } from '../lib/types';
 import { useAuth } from './AuthContext';
 
+export type HouseholdRefreshOptions = {
+  /** Si true, ne pas basculer sur l’écran de chargement (évite de démonter l’onboarding pendant un refresh). */
+  silent?: boolean;
+};
+
 type HouseholdContextValue = {
   household: Household | null;
   members: HouseholdMember[];
   categories: Category[];
   categoryBudgets: CategoryBudget[];
   loading: boolean;
-  refresh: () => Promise<void>;
+  refresh: (opts?: HouseholdRefreshOptions) => Promise<void>;
   setHouseholdId: (id: string | null) => void;
 };
 
@@ -43,7 +48,8 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
   const [categoryBudgets, setCategoryBudgets] = useState<CategoryBudget[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: HouseholdRefreshOptions) => {
+    const silent = opts?.silent === true;
     if (!user) {
       setHousehold(null);
       setMembers([]);
@@ -60,7 +66,9 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     const { data: hm, error: hmErr } = await supabase
       .from('household_members')
       .select('household_id')
