@@ -26,9 +26,11 @@ Attention
   faire un audit schema (db pull / comparaison manuelle).
 
 Sans CLI
-  Ouvre chaque fichier .sql dans supabase/migrations/ pas encore applique et
-  execute le contenu dans Supabase Dashboard > SQL Editor (y compris
-  20260408140000_households_insert_rls_authenticated.sql pour le bug RLS).
+  Correctif rapide « création foyer refusée (sécurité) » : exécuter une seule fois
+  le fichier supabase/sql-dashboard/01_fix_households_insert_rls.sql dans
+  Dashboard > SQL Editor.
+
+  Sinon ouvre chaque fichier .sql dans supabase/migrations/ pas encore applique.
 
 ---
 
