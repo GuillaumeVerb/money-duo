@@ -112,7 +112,10 @@ export function RootNavigator () {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        key={showOnboarding ? 'stack-onboarding' : 'stack-main'}
+        screenOptions={{ headerShown: false }}
+      >
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : showOnboarding ? (

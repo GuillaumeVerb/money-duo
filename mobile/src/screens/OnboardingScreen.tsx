@@ -75,10 +75,19 @@ export function OnboardingScreen () {
   );
 
   const finishInviteFlow = useCallback(async () => {
+    const next = await refresh({ silent: true });
+    if (!next) {
+      notify(
+        'Foyer',
+        'On n’a pas pu charger ton foyer. Réessaie ou rafraîchis la page.',
+        'danger',
+        6000
+      );
+      return;
+    }
     setInviteOpen(false);
     setInviteUrl(null);
-    await refresh({ silent: true });
-  }, [refresh]);
+  }, [refresh, notify]);
 
   async function createHousehold () {
     if (!user || !name.trim()) {
@@ -232,7 +241,10 @@ export function OnboardingScreen () {
           style={styles.modalBackdrop}
           onPress={() => void finishInviteFlow()}
         >
-          <View style={styles.modalCard}>
+          <Pressable
+            style={styles.modalCard}
+            onPress={(e) => e.stopPropagation()}
+          >
             <Text style={styles.modalTitle}>Invitation partenaire</Text>
             <Text style={styles.modalSub}>
               Envoie ce lien à ton partenaire — valable 7 jours.
@@ -276,7 +288,7 @@ export function OnboardingScreen () {
             >
               <Text style={styles.primaryText}>Continuer vers l’app</Text>
             </Pressable>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     </ScrollView>

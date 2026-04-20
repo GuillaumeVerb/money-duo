@@ -32,7 +32,8 @@ type HouseholdContextValue = {
   categories: Category[];
   categoryBudgets: CategoryBudget[];
   loading: boolean;
-  refresh: (opts?: HouseholdRefreshOptions) => Promise<void>;
+  /** Retourne le foyer chargé, ou null si aucun / erreur (utile après onboarding). */
+  refresh: (opts?: HouseholdRefreshOptions) => Promise<Household | null>;
   setHouseholdId: (id: string | null) => void;
 };
 
@@ -48,7 +49,7 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
   const [categoryBudgets, setCategoryBudgets] = useState<CategoryBudget[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async (opts?: HouseholdRefreshOptions) => {
+  const load = useCallback(async (opts?: HouseholdRefreshOptions): Promise<Household | null> => {
     const silent = opts?.silent === true;
     if (!user) {
       setHousehold(null);
@@ -56,7 +57,7 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       setCategories([]);
       setCategoryBudgets([]);
       setLoading(false);
-      return;
+      return null;
     }
     if (demoMode) {
       setHousehold(demoHousehold);
@@ -64,7 +65,7 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       setCategories(demoCategories);
       setCategoryBudgets(demoCategoryBudgets);
       setLoading(false);
-      return;
+      return demoHousehold;
     }
     if (!silent) {
       setLoading(true);
@@ -83,26 +84,36 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       setCategories([]);
       setCategoryBudgets([]);
       setLoading(false);
-      return;
+      return null;
     }
 
     const hid = hm.household_id as string;
 
-    const [{ data: hh }, { data: mems }, { data: cats }, budgetsRes] =
-      await Promise.all([
-        supabase.from('households').select('*').eq('id', hid).single(),
-        supabase.from('household_members').select('*').eq('household_id', hid),
-        supabase.from('categories').select('*').eq('household_id', hid),
-        supabase.from('category_budgets').select('*').eq('household_id', hid),
-      ]);
+    const [hhRes, memsRes, catsRes, budgetsRes] = await Promise.all([
+      supabase.from('households').select('*').eq('id', hid).single(),
+      supabase.from('household_members').select('*').eq('household_id', hid),
+      supabase.from('categories').select('*').eq('household_id', hid),
+      supabase.from('category_budgets').select('*').eq('household_id', hid),
+    ]);
 
-    setHousehold(hh as Household);
-    setMembers((mems ?? []) as HouseholdMember[]);
-    setCategories((cats ?? []) as Category[]);
+    if (hhRes.error || !hhRes.data) {
+      setHousehold(null);
+      setMembers([]);
+      setCategories([]);
+      setCategoryBudgets([]);
+      setLoading(false);
+      return null;
+    }
+
+    const hh = hhRes.data as Household;
+    setHousehold(hh);
+    setMembers((memsRes.data ?? []) as HouseholdMember[]);
+    setCategories((catsRes.data ?? []) as Category[]);
     setCategoryBudgets(
       budgetsRes.error ? [] : ((budgetsRes.data ?? []) as CategoryBudget[])
     );
     setLoading(false);
+    return hh;
   }, [user, demoMode]);
 
   useEffect(() => {
