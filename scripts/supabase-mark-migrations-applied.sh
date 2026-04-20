@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 # Migrations à laisser à db push (RLS insert households + variante sans TO authenticated).
-SKIP_VERSIONS="20260408140000 20260408150000"
+SKIP_VERSIONS="20260408140000 20260408150000 20260408160000"
 ALL=0
 if [[ "${1:-}" == "--all" ]]; then
   ALL=1

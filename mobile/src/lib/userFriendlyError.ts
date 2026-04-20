@@ -16,10 +16,14 @@ export function friendlyErrorMessage (e: unknown): string {
     return 'Une erreur est survenue.';
   }
   const lower = m.toLowerCase ();
+  if (lower.includes('not authenticated')) {
+    return 'Tu n’es pas connecté·e. Reconnecte-toi puis réessaie.';
+  }
   if (
-    lower.includes ('jwt') ||
-    lower.includes ('session') ||
-    lower.includes ('auth')
+    lower.includes('jwt') ||
+    lower.includes('session expired') ||
+    lower.includes('invalid refresh') ||
+    lower.includes('invalid login')
   ) {
     return 'Session expirée ou invalide. Reconnectez-vous.';
   }

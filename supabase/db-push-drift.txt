@@ -26,9 +26,12 @@ Attention
   faire un audit schema (db pull / comparaison manuelle).
 
 Sans CLI
-  Correctif rapide « création foyer refusée (sécurité) » : exécuter une seule fois
-  le fichier supabase/sql-dashboard/01_fix_households_insert_rls.sql dans
-  Dashboard > SQL Editor.
+  Correctif « création foyer » (app actuelle = RPC côté serveur) :
+  exécuter supabase/sql-dashboard/02_bootstrap_new_household_rpc.sql dans
+  Dashboard > SQL Editor (une fois).
+
+  Optionnel (politique INSERT classique) :
+  supabase/sql-dashboard/01_fix_households_insert_rls.sql
 
   Sinon ouvre chaque fichier .sql dans supabase/migrations/ pas encore applique.
 

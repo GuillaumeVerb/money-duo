@@ -110,57 +110,33 @@ export function OnboardingScreen () {
     }
     setBusy(true);
     try {
-      const { data: hh, error: hErr } = await supabase
-        .from('households')
-        .insert({
-          name: name.trim(),
-          currency: 'EUR',
-          default_split_rule: rule,
-          default_custom_percent:
-            rule === 'custom_percent' ? Number(customPct) : null,
-        })
-        .select()
-        .single();
-
-      if (hErr || !hh) {
-        throw hErr ?? new Error('Impossible de créer le foyer.');
-      }
-
-      const { error: mErr } = await supabase.from('household_members').insert({
-        household_id: hh.id,
-        user_id: user.id,
-        role: 'owner',
-      });
-      if (mErr) {
-        throw mErr;
-      }
-
-      const cats = DEFAULT_CATEGORIES.map((n) => ({
-        household_id: hh.id,
-        name: n,
-      }));
-      const { error: catErr } = await supabase.from('categories').insert(cats);
-      if (catErr) {
-        throw catErr;
-      }
-
       const token = randomInviteToken();
       const expires = new Date();
       expires.setDate(expires.getDate() + 7);
 
-      const { error: invErr } = await supabase.from('household_invites').insert({
-        household_id: hh.id,
-        token,
-        invited_by: user.id,
-        expires_at: expires.toISOString(),
+      // RPC SECURITY DEFINER : évite les refus RLS sur les INSERT PostgREST (JWT / politiques).
+      const { data: rows, error: rpcErr } = await supabase.rpc('bootstrap_new_household', {
+        _name: name.trim(),
+        _currency: 'EUR',
+        _default_split_rule: rule,
+        _default_custom_percent:
+          rule === 'custom_percent' ? Number(customPct) : null,
+        _category_names: DEFAULT_CATEGORIES,
+        _invite_token: token,
+        _invite_expires_at: expires.toISOString(),
       });
-      if (invErr) {
-        throw invErr;
+
+      if (rpcErr || !rows?.length) {
+        throw rpcErr ?? new Error('Impossible de créer le foyer.');
       }
 
-      pendingHouseholdIdRef.current = hh.id;
+      const row = rows[0] as { household_id: string; invite_token: string };
+      const hhId = row.household_id;
+      const invTok = row.invite_token;
 
-      const url = buildInviteUrl(token);
+      pendingHouseholdIdRef.current = hhId;
+
+      const url = buildInviteUrl(invTok);
 
       // Ne pas appeler refresh() tout de suite : ça mettait loading=true et remplaçait
       // tout l’écran par le spinner (RootNavigator), ce qui démontait l’onboarding sans feedback.
@@ -173,7 +149,21 @@ export function OnboardingScreen () {
         6000
       );
     } catch (e: unknown) {
-      notify('Création', friendlyErrorMessage(e), 'danger', 6000);
+      const friendly = friendlyErrorMessage(e);
+      let raw = '';
+      if (e !== null && typeof e === 'object') {
+        const o = e as {
+          message?: string;
+          details?: string;
+          hint?: string;
+        };
+        raw = [o.message, o.details, o.hint].filter(Boolean).join(' — ');
+      }
+      const msg =
+        Platform.OS === 'web' && raw.length > 0 && !friendly.includes(raw)
+          ? `${friendly}\n${raw}`.slice(0, 520)
+          : friendly;
+      notify('Création', msg, 'danger', 12000);
     } finally {
       setBusy(false);
     }
