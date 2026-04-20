@@ -24,6 +24,11 @@ import { useAuth } from './AuthContext';
 export type HouseholdRefreshOptions = {
   /** Si true, ne pas basculer sur l’écran de chargement (évite de démonter l’onboarding pendant un refresh). */
   silent?: boolean;
+  /**
+   * Juste après création du foyer : si la ligne `household_members` n’est pas encore visible
+   * (course avec un autre chargement), tenter quand même ce `household_id` (RLS doit l’autoriser).
+   */
+  preferredHouseholdId?: string;
 };
 
 type HouseholdContextValue = {
@@ -43,6 +48,8 @@ const HouseholdContext = createContext<HouseholdContextValue | undefined>(
 
 export function HouseholdProvider ({ children }: { children: React.ReactNode }) {
   const { user, demoMode } = useAuth();
+  /** Réf stable : `session.user` change d’objet à chaque TOKEN_REFRESHED → ne pas en dépendre pour `load`. */
+  const userId = user?.id ?? null;
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -51,7 +58,7 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
 
   const load = useCallback(async (opts?: HouseholdRefreshOptions): Promise<Household | null> => {
     const silent = opts?.silent === true;
-    if (!user) {
+    if (!userId) {
       setHousehold(null);
       setMembers([]);
       setCategories([]);
@@ -73,12 +80,19 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
     const { data: hm, error: hmErr } = await supabase
       .from('household_members')
       .select('household_id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle();
 
-    if (hmErr || !hm?.household_id) {
+    const fromMembership =
+      !hmErr && hm?.household_id ? String(hm.household_id) : null;
+    const hint = opts?.preferredHouseholdId?.trim();
+    const fromHint =
+      hint && hint.length >= 32 ? hint : null;
+    const hid = fromMembership ?? fromHint;
+
+    if (!hid) {
       setHousehold(null);
       setMembers([]);
       setCategories([]);
@@ -86,8 +100,6 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
       setLoading(false);
       return null;
     }
-
-    const hid = hm.household_id as string;
 
     const [hhRes, memsRes, catsRes, budgetsRes] = await Promise.all([
       supabase.from('households').select('*').eq('id', hid).single(),
@@ -114,7 +126,7 @@ export function HouseholdProvider ({ children }: { children: React.ReactNode }) 
     );
     setLoading(false);
     return hh;
-  }, [user, demoMode]);
+  }, [userId, demoMode]);
 
   useEffect(() => {
     void load();

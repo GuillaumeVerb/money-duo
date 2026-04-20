@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -19,7 +19,7 @@ import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { buildInviteUrl } from '../lib/inviteUrl';
 import { friendlyErrorMessage } from '../lib/userFriendlyError';
-import type { SplitRuleKind } from '../lib/types';
+import type { Household, SplitRuleKind } from '../lib/types';
 import { screenContentPaddingTop } from '../theme/screenLayout';
 import {
   colors,
@@ -50,6 +50,8 @@ export function OnboardingScreen () {
   const [busy, setBusy] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  /** Foyer tout juste créé — utilisé si le refresh lit encore « pas de membre » (course / session). */
+  const pendingHouseholdIdRef = useRef<string | null>(null);
 
   const notify = useCallback(
     (
@@ -75,7 +77,18 @@ export function OnboardingScreen () {
   );
 
   const finishInviteFlow = useCallback(async () => {
-    const next = await refresh({ silent: true });
+    const pref = pendingHouseholdIdRef.current;
+    let next: Household | null = null;
+    for (let i = 0; i < 5; i++) {
+      next = await refresh({
+        silent: true,
+        ...(pref ? { preferredHouseholdId: pref } : {}),
+      });
+      if (next) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 120 * (i + 1)));
+    }
     if (!next) {
       notify(
         'Foyer',
@@ -85,6 +98,7 @@ export function OnboardingScreen () {
       );
       return;
     }
+    pendingHouseholdIdRef.current = null;
     setInviteOpen(false);
     setInviteUrl(null);
   }, [refresh, notify]);
@@ -144,6 +158,8 @@ export function OnboardingScreen () {
         throw invErr;
       }
 
+      pendingHouseholdIdRef.current = hh.id;
+
       const url = buildInviteUrl(token);
 
       // Ne pas appeler refresh() tout de suite : ça mettait loading=true et remplaçait
@@ -169,6 +185,7 @@ export function OnboardingScreen () {
       : {};
 
   return (
+    <>
     <ScrollView
       contentContainerStyle={[
         styles.root,
@@ -230,6 +247,7 @@ export function OnboardingScreen () {
       >
         <Text style={styles.primaryText}>Continuer</Text>
       </Pressable>
+    </ScrollView>
 
       <Modal
         visible={inviteOpen}
@@ -237,14 +255,16 @@ export function OnboardingScreen () {
         animationType="fade"
         onRequestClose={() => void finishInviteFlow()}
       >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => void finishInviteFlow()}
-        >
+        <View style={styles.modalRoot}>
           <Pressable
-            style={styles.modalCard}
-            onPress={(e) => e.stopPropagation()}
+            style={[StyleSheet.absoluteFillObject, styles.modalDim]}
+            onPress={() => void finishInviteFlow()}
+          />
+          <View
+            style={[StyleSheet.absoluteFillObject, styles.modalCardLayer]}
+            pointerEvents="box-none"
           >
+            <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Invitation partenaire</Text>
             <Text style={styles.modalSub}>
               Envoie ce lien à ton partenaire — valable 7 jours.
@@ -288,10 +308,11 @@ export function OnboardingScreen () {
             >
               <Text style={styles.primaryText}>Continuer vers l’app</Text>
             </Pressable>
-          </Pressable>
-        </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
-    </ScrollView>
+    </>
   );
 }
 
@@ -370,9 +391,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   primaryText: { color: colors.surface, fontWeight: '600', fontSize: fontSize.body },
-  modalBackdrop: {
+  modalRoot: {
     flex: 1,
+  },
+  modalDim: {
     backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalCardLayer: {
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
@@ -385,6 +410,8 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     alignSelf: 'center',
     width: '100%',
+    zIndex: 1,
+    elevation: 6,
   },
   modalTitle: {
     fontSize: fontSize.titleSm,
