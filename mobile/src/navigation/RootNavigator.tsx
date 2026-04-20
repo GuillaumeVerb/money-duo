@@ -85,7 +85,7 @@ export function RootNavigator () {
       });
       if (!cancelled && !error && data) {
         setPendingInviteToken(null);
-        await refresh();
+        await refresh({ silent: true });
       }
     })();
     return () => {
@@ -93,7 +93,9 @@ export function RootNavigator () {
     };
   }, [session?.user, pendingInviteToken, refresh, demoMode]);
 
-  if (authLoading || (isAuthenticated && hhLoading)) {
+  // Ne pas démonter toute la nav (spinner plein écran) pendant un refresh si le foyer est déjà
+  // connu — sinon clignotements / « écran qui tremble » sur le web après onboarding.
+  if (authLoading || (isAuthenticated && hhLoading && !household)) {
     return (
       <View
         style={{
@@ -112,10 +114,7 @@ export function RootNavigator () {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        key={showOnboarding ? 'stack-onboarding' : 'stack-main'}
-        screenOptions={{ headerShown: false }}
-      >
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : showOnboarding ? (
