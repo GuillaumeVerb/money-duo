@@ -1,0 +1,31 @@
+Message : "Remote migration versions not found in local migrations directory"
+
+Signification
+  Sur ton projet Supabase (cloud), la table d'historique des migrations liste des
+  versions (ex. 2026041008xxxx) qui ne correspondent a aucun fichier dans
+  supabase/migrations/ de ce depot. Souvent : essais SQL dans le dashboard,
+  autre ordinateur, ou depot pas a jour.
+
+Avant repair
+  git pull
+  Verifie que tu es bien "link" sur le bon projet : supabase projects list
+
+Reparer puis pousser (remplace les versions par celles affichees chez toi si differentes)
+  cd racine-du-repo
+  supabase migration repair --status reverted \
+    20260410080740 20260410084231 20260410084339 20260410084441 20260410084445 \
+    20260410084504 20260410084529 20260410084536 20260410084538 20260410084554 \
+    20260410084600 20260410084603 20260410084612
+
+  supabase db push
+
+Attention
+  "repair reverted" dit au cloud que ces migrations sont annulees au niveau
+  historique uniquement. Si elles avaient vraiment change le schema et que tu
+  comptes la dessus, il faut plutot recuperer les fichiers SQL manquants ou
+  faire un audit schema (db pull / comparaison manuelle).
+
+Sans CLI
+  Ouvre chaque fichier .sql dans supabase/migrations/ pas encore applique et
+  execute le contenu dans Supabase Dashboard > SQL Editor (y compris
+  20260408140000_households_insert_rls_authenticated.sql pour le bug RLS).
