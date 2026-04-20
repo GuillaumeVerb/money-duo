@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -253,6 +254,22 @@ export function OnboardingScreen () {
             >
               <Text style={styles.secondaryBtnTxt}>Copier le lien</Text>
             </Pressable>
+            {Platform.OS !== 'web' && inviteUrl ? (
+              <Pressable
+                style={[styles.secondaryBtn, webPointer, { marginTop: spacing.sm }]}
+                onPress={() => {
+                  void Share.share(
+                    Platform.OS === 'ios'
+                      ? { url: inviteUrl }
+                      : { message: inviteUrl, title: 'Invitation partenaire' }
+                  ).catch(() => {
+                    /* feuille partage annulée */
+                  });
+                }}
+              >
+                <Text style={styles.secondaryBtnTxt}>Partager…</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               style={[styles.primary, webPointer, { marginTop: spacing.md }]}
               onPress={() => void finishInviteFlow()}
