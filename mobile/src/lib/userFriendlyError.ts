@@ -16,6 +16,16 @@ export function friendlyErrorMessage (e: unknown): string {
     return 'Une erreur est survenue.';
   }
   const lower = m.toLowerCase ();
+  if (
+    lower.includes('could not find the function') ||
+    lower.includes('schema cache')
+  ) {
+    return (
+      'La base ne connaît pas encore la fonction « bootstrap_new_household ». ' +
+      'Dans Supabase : SQL Editor → exécuter supabase/sql-dashboard/02_bootstrap_new_household_rpc.sql, ' +
+      'puis Project settings → API → recharger le schéma (ou attends 1–2 min).'
+    );
+  }
   if (lower.includes('not authenticated')) {
     return 'Tu n’es pas connecté·e. Reconnecte-toi puis réessaie.';
   }

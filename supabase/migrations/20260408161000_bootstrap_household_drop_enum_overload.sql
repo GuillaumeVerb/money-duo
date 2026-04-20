@@ -1,4 +1,4 @@
--- Création de foyer : RPC SECURITY DEFINER. _default_split_rule en text pour PostgREST (rpc JSON).
+-- Si la 600 avait déjà été appliquée avec _default_split_rule en enum, PostgREST ne matche pas le client.
 drop function if exists public.bootstrap_new_household(text, text, public.split_rule_kind, numeric, text[], text, timestamptz);
 
 create or replace function public.bootstrap_new_household (
@@ -92,6 +92,3 @@ grant execute on function public.bootstrap_new_household (
   text,
   timestamptz
 ) to authenticated;
-
-comment on function public.bootstrap_new_household is
-  'Crée foyer + membre owner + catégories + invite pour auth.uid() ; bypass RLS sur les INSERT.';
