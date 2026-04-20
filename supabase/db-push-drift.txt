@@ -29,3 +29,26 @@ Sans CLI
   Ouvre chaque fichier .sql dans supabase/migrations/ pas encore applique et
   execute le contenu dans Supabase Dashboard > SQL Editor (y compris
   20260408140000_households_insert_rls_authenticated.sql pour le bug RLS).
+
+---
+
+Message : type "member_role" already exists (en appliquant 20250322000001_initial.sql)
+
+Signification
+  La base distante A DEJA le schema (tables / enums), mais l'historique des
+  migrations est vide ou reinitialise : db push veut rejouer initial.sql.
+
+Solution (projet deja link)
+  Depuis la racine du depot Money Duo :
+
+    bash scripts/supabase-mark-migrations-applied.sh
+    supabase db push
+
+  Le script marque toutes les migrations locales comme "applied" SAUF
+  20260408140000 (RLS households), pour que db push ne joue que celle-ci.
+
+  Si la migration RLS est deja passee a la main :
+
+    bash scripts/supabase-mark-migrations-applied.sh --all
+    supabase db push
+  (ne devrait plus rien appliquer si tout est a jour.)
