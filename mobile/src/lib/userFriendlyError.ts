@@ -41,6 +41,16 @@ export function friendlyErrorMessage (e: unknown): string {
     return 'Impossible : des données y sont encore liées.';
   }
   if (
+    lower.includes ('row-level security') ||
+    lower.includes ('rls') ||
+    lower.includes ('violates row-level')
+  ) {
+    return (
+      'La base de données a refusé l’action (sécurité). Réessaie après t’être reconnecté·e ; ' +
+      'si ça continue, vérifie que les migrations Supabase du dépôt sont bien appliquées sur ton projet.'
+    );
+  }
+  if (
     lower.includes ('rate limit') ||
     lower.includes ('too many requests') ||
     lower.includes ('429') ||
