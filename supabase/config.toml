@@ -40,8 +40,9 @@ shadow_port = 54320
 # health_timeout = "2m"
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
-# Aligner sur la version Postgres du projet hébergé (ex. après `supabase link`, le CLI affiche le diff si ça diverge).
-major_version = 17
+# Local `supabase start` : le CLI 2.2.x n’accepte que 14 ou 15 (17 = « Invalid db.major_version »).
+# Le projet hébergé peut être en Postgres 17 ; ce champ ne bloque pas `db push` vers le cloud.
+major_version = 15
 
 [db.pooler]
 enabled = false
